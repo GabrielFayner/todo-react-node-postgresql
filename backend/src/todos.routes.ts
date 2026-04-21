@@ -14,8 +14,9 @@ todosRoutes.get("/todos", async (req, res) => {
   return res.status(200).json(todos);
 });
 
-todosRoutes.put("/todos", async (req, res) => {
-  const { id, name, status } = req.body;
+todosRoutes.put("/todos/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name, status } = req.body;
 
   if (!id) return res.status(400).json({ error: "ID is required" });
 

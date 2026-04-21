@@ -1,144 +1,115 @@
 import { useEffect, useState } from "react";
-import { AiOutlineEdit, AiOutlineDelete } from "react-icons/ai";
-import "./App.css";
-import axios from "axios";
+import { TodoList, type TodoType } from "@/shared/components/TodoList";
+import { TodoService } from "@/shared/services/todo";
+import {
+  Container,
+  Header,
+  InputLabel,
+  InputWrapper,
+  TaskButton,
+  TaskInput,
+  Title,
+} from "@/styled";
 
-type TodoType = {
-  name: string;
-  status: boolean;
-  id: number;
-};
-
-type TodoListType = {
-  list: TodoType[];
-  handleStatusChange: (todo: TodoType) => void;
-  handleEditButtonClick: () => void;
-  handleDeleteButtonClick: (todo: TodoType) => void;
-};
-
-const TodoList = ({
-  list,
-  handleStatusChange,
-  handleEditButtonClick,
-  handleDeleteButtonClick,
-}: TodoListType) => {
-  return (
-    <div className="todos">
-      {list.map((todo) => {
-        return (
-          <div className="todo">
-            <button
-              onClick={() => handleStatusChange(todo)}
-              className="checkbox"
-              style={{ backgroundColor: todo.status ? "#A879E6" : "white" }}
-            ></button>
-            <p>{todo.name}</p>
-            <button className="icon-action">
-              <AiOutlineEdit
-                onClick={() => handleEditButtonClick()}
-                size={20}
-                color={"#64697b"}
-              />
-            </button>
-            <button
-              onClick={() => handleDeleteButtonClick(todo)}
-              className="icon-action"
-            >
-              <AiOutlineDelete size={20} color={"#64697b"} />
-            </button>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
-function App() {
-   function handleWithNewButton() {
-    console.log("fasfas");
-    setInputVisibility(!inputVisibility);
-  }
-
-  async function getTodos() {
-    const response = await axios.get("http://localhost:3000/todos");
-    setTodo(response.data);
-  }
-  async function createTodo() {
-    await axios.post("http://localhost:3000/todos", {
-      name: inputValue,
-      status: false,
-    });
-    setInputValue("");
-    getTodos();
-  }
-  function handleWithEditButtonCLick() {
-    setInputVisibility(true);
-  }
-
-  async function deleteTodo(todo: TodoType) {
-      await axios.delete(
-      `http://localhost:3000/todos/${todo.id}`,
-    );
-    getTodos();
-  }
-  async function modifyStatusTodo(todo: TodoType) {
-     await axios.put("http://localhost:3000/todos/", {
-      id: todo.id,
-      status: !todo.status,
-    });
-    getTodos();
-  }
-  async function editTodo(todo: TodoType) {
-     await axios.put(`http://localhost:3000/todos/${todo.id}`, {
-      id: selectTodo?.id,
-      name: inputValue,
-      status: todo.status,
-    });
-    setInputValue("");
-    setInputVisibility(false);
-    setSelectTodo(null);
-    getTodos();
-  }
-  const [todo, setTodo] = useState([]);
+const App = () => {
+  const [todo, setTodo] = useState<TodoType[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [inputVisibility, setInputVisibility] = useState(false);
   const [selectTodo, setSelectTodo] = useState<TodoType | null>(null);
 
+  const handleWithNewButton = () => setInputVisibility(!inputVisibility);
+
+  const handleEmptyInput = () => {
+    setInputValue("");
+    setInputVisibility(false);
+    setSelectTodo(null);
+  }
+
+  const loadTodos = async () => {
+    try {
+      const todos = await TodoService.getTodos();
+      setTodo(todos);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  const createTodo = async () => {
+    if (!inputValue.trim()) return;
+    await TodoService.createTodo(inputValue);
+    setInputValue("");
+    await loadTodos();
+  }
+
+  const deleteTodo = async (todo: TodoType) => {
+    await TodoService.deleteTodo(todo.id);
+    await loadTodos();
+    handleEmptyInput()
+  }
+
+  const editTodo = async (todo: TodoType) => {
+    if (!inputValue.trim()) return;
+    await TodoService.updateTodo(todo.id, inputValue, todo.status);
+    await loadTodos();
+    handleEmptyInput()
+  }
+
+  const modifyStatusTodo = async (todo: TodoType) => {
+    await TodoService.updateTodo(todo.id, todo.name, !todo.status);
+    await loadTodos();
+  }
+
+  const handleWithEditButtonCLick = (todo: TodoType) => {
+    setSelectTodo(todo);
+    setInputValue(todo.name);
+    setInputVisibility(true);
+  }
+
   useEffect(() => {
-    getTodos();
+    const fetchTodos = async () => {
+      await loadTodos();
+    }
+    fetchTodos();
   }, []);
 
   const handleNewTask = () => {
     if (!inputVisibility) return handleWithNewButton();
-
     if (selectTodo) return editTodo(selectTodo);
-
     return createTodo();
   };
 
   return (
-    <>
-      <header className="container">
-        <div className="header">
-          <h1>Dont be lazzy</h1>
-        </div>
-        <TodoList
-          list={todo}
-          handleStatusChange={modifyStatusTodo}
-          handleEditButtonClick={handleWithEditButtonCLick}
-          handleDeleteButtonClick={deleteTodo}
-        />
-        <input
-          value={inputValue}
-          style={{ display: inputVisibility ? "block" : "none" }}
-          onChange={(e) => setInputValue(e.target.value)}
-          className="imputname"
-          placeholder="New task"
-        />
-        <button className="newTaskButton" onClick={handleNewTask}>
-          {inputVisibility ? "Confirm" : "New Task"}
-        </button>
-      </header>
-    </>
+    <Container>
+      <Header>
+        <Title>TODO LIST</Title>
+      </Header>
+      <TodoList
+        list={todo}
+        handleStatusChange={modifyStatusTodo}
+        handleEditButtonClick={handleWithEditButtonCLick}
+        handleDeleteButtonClick={deleteTodo}
+      />
+      {inputVisibility && (
+        <InputWrapper>
+          <InputLabel htmlFor="new-task-input">
+            {selectTodo ? "Edit task" : "New task"}
+          </InputLabel>
+          <TaskInput
+            id="new-task-input"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder={
+              selectTodo
+                ? "Rename your task..."
+                : "What needs to be done?"
+            }
+          />
+        </InputWrapper>
+      )}
+      <TaskButton onClick={handleNewTask}>
+        {inputVisibility ? "Confirm" : "New Task"}
+      </TaskButton>
+    </Container>
   );
 }
 
